@@ -1,0 +1,10 @@
+samples = ["SRR6023100", "SRR6023101"]
+
+rule fastqc:
+    input:
+        "samples/{sample}.fastq.gz"
+    output:
+        html="fastqc/{sample}_fastqc.html",
+        zip="fastqc/{sample}_fastqc.zip"
+    shell:
+        "mkdir -p FQC && fastqc --extract -t 2 -o FQC {input}"
