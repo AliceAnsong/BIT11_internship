@@ -1,10 +1,23 @@
-samples = ["SRR6023100", "SRR6023101"]
+srr = ["SRR6023100", "SRR6023101"]
+
+rule all:
+    input:
+        expand("samples/FQC/{sample}_fastqc.html", sample=srr),
+        expand("samples/FQC/{sample}_fastqc.zip", sample=srr)
 
 rule fastqc:
     input:
         "samples/{sample}.fastq.gz"
     output:
-        html="fastqc/{sample}_fastqc.html",
-        zip="fastqc/{sample}_fastqc.zip"
+        "samples/FQC/{sample}_fastqc.html",
+        "samples/FQC/{sample}_fastqc.zip"
     shell:
-        "mkdir -p FQC && fastqc --extract -t 2 -o FQC {input}"
+        "mkdir -p samples/FQC && fastqc --extract -t 2 -o samples/FQC {input}"
+
+rule multiqc:
+    input:
+        "samples/FQC/"
+    output:
+        "samples/MQC/multiqc_report.html"
+    shell: 
+        "mkdir -p samples/MQC && multiqc {input} -o samples/MQC"
