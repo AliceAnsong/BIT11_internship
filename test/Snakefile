@@ -1,23 +1,30 @@
-srr = ["SRR6023100", "SRR6023101"]
+configfile: "config.yaml"
+
+input_dir = config["input_dir"]
 
 rule all:
     input:
-        expand("samples/FQC/{sample}_fastqc.html", sample=srr),
-        expand("samples/FQC/{sample}_fastqc.zip", sample=srr)
+        expand("{dir}/FQC/{sample}_fastqc.html", dir=input_dir, sample=config["srr"]),
+        expand("{dir}/FQC/{sample}_fastqc.zip", dir=input_dir, sample=config["srr"]),
+        f"{input_dir}/MQC/multiqc_report.html"
 
 rule fastqc:
     input:
-        "samples/{sample}.fastq.gz"
+        "{input_dir}/{sample}.fastq.gz"
     output:
-        "samples/FQC/{sample}_fastqc.html",
-        "samples/FQC/{sample}_fastqc.zip"
+        "{input_dir}/FQC/{sample}_fastqc.html",
+        "{input_dir}/FQC/{sample}_fastqc.zip"
+    params:
+        input_dir=input_dir
     shell:
-        "mkdir -p samples/FQC && fastqc --extract -t 2 -o samples/FQC {input}"
+        "mkdir -p {params.input_dir}/FQC && fastqc --extract -t 2 -o {params.input_dir}/FQC {input}"
 
 rule multiqc:
     input:
-        "samples/FQC/"
+        expand("{dir}/FQC/{sample}_fastqc.zip", dir=input_dir, sample=config["srr"])
     output:
-        "samples/MQC/multiqc_report.html"
+        f"{input_dir}/MQC/multiqc_report.html"
+    params:
+        input_dir=input_dir
     shell: 
-        "mkdir -p samples/MQC && multiqc {input} -o samples/MQC"
+        "mkdir -p {input_dir}/MQC && multiqc {input} -o {params.input_dir}/MQC"
