@@ -5,6 +5,7 @@ configfile:"config.yaml"
 
 input_dir = config["input_dir"]
 fasta = config["fasta"]
+ehdn_script = config["EHDN_script"]
 
 samples = [
     re.sub(r"\.cram$", "", file)
@@ -14,14 +15,14 @@ samples = [
 
 rule all:
     input:
-        expand("results/EHdn/str-profiles/{sample}.str_profile.json", sample=samples)
+        expand("results/EHdn/prep/str-profiles/{sample}.str_profile.json", sample=samples)
 
-
+###ExpansionHunter Denovo
 rule EHdn_STR_profile:
     input:
         lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
     output:
-        "results/EHdn/str-profiles/{sample}.str_profile.json"
+        "results/EHdn/prep/str-profiles/{sample}.str_profile.json"
     params:
         input_dir=input_dir,
         fasta=fasta
@@ -29,6 +30,35 @@ rule EHdn_STR_profile:
         ExpansionHunterDenovo profile \
         --reads {input} \
         --reference {params.fasta} \
-        --output-prefix results/EHdn/str-profiles/{wildcards.sample} \
+        --output-prefix results/EHdn/prep/str-profiles/{wildcards.sample} \
         --min-anchor-mapq 50 \
-        --max-irr-mapq 40"
+        --max-irr-mapq 40 \
+        && bash manifest.sh
+'''
+rule Ehdn_merge_profiles:
+    input:
+        expand("results/EHdn/prep/str-profiles/{sample}.str_profile.json", sample=samples)
+        "results/EHdn/prep/manifest.tsv"
+    output:
+        "results/EHdn/prep/dataset.multisample_profile.json"
+    params:
+        fasta=fasta
+    shell:"ExpansionHunterDenovo merge \
+        --reference {params.fasta} \
+        --manifest results/EHdn/prep/manifest.tsv \
+        --output-prefix dataset"
+
+#motif-based comparison
+rule ExpansionHunterDenovo:
+    input:
+        "results/EHdn/prep/manifest.tsv"
+        "results/EHdn/prep/dataset.multisample_profile.json"
+    output:
+        "results/EHdn/dataset.outlier_motif.tsv"
+    shell:"{ehdn_script}/outlier.py motif \
+        --manifest results/EHdn/prep/manifest.tsv \
+        --multisample-profile results/EHdn/prep/dataset.multisample_profile.json \
+        --output results/EHdn/dataset.outlier_motif.tsv \
+        # [--target-regions target_regions.bed]""
+
+'''
