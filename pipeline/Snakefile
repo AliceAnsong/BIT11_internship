@@ -17,6 +17,7 @@ rule all:
     input:
         expand("results/EHdn/prep/str-profiles/{sample}.str_profile.json", sample=samples)
 
+
 ###ExpansionHunter Denovo
 rule EHdn_STR_profile:
     input:
@@ -33,7 +34,16 @@ rule EHdn_STR_profile:
         --output-prefix results/EHdn/prep/str-profiles/{wildcards.sample} \
         --min-anchor-mapq 50 \
         --max-irr-mapq 40 \
-        && bash manifest.sh
+        | bash manifest.sh"
+
+#rule EHdn_manifest:
+#    input:
+#        expand("results/EHdn/prep/str-profiles/{sample}.str_profile.json", sample=samples)
+#    output:
+#        "results/EHdn/prep/manifest.tsv"
+#    shell:
+#        "bash manifest.sh"
+    
 '''
 rule Ehdn_merge_profiles:
     input:
