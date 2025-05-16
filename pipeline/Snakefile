@@ -43,7 +43,7 @@ rule EHdn_manifest:
     output:
         "results/EHdn_prep/manifest.tsv"
     script:
-        "bash manifest.sh"
+        "manifest.sh"
     
 ''''
 rule Ehdn_merge_profiles:
