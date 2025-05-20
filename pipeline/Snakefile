@@ -16,11 +16,11 @@ samples = [
 
 rule all:
     input:
-        expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json", sample=samples),
-        "results/EHdn_prep/manifest.tsv"
+        "results/dataset_EHdn.tsv"
 
 
 ###ExpansionHunter Denovo
+# Creates STR-profile per sample, containing info on STR longer than the read length of sample
 rule EHdn_STR_profile:
     input:
         lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
@@ -36,7 +36,7 @@ rule EHdn_STR_profile:
         --min-anchor-mapq 50 \
         --max-irr-mapq 40 "
         
-# bash manifest.sh"
+# Creates tsv file containing sample id, case status, and path to the associated STR-profile
 rule EHdn_manifest:
     input:
         expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json",sample=samples)
@@ -45,10 +45,10 @@ rule EHdn_manifest:
     script:
         "manifest.sh"
     
-''''
+# Merges STR-profiles of all samples in one file
 rule Ehdn_merge_profiles:
     input:
-        expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json", sample=samples)
+        expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json", sample=samples),
         "results/EHdn_prep/manifest.tsv"
     output:
         "results/EHdn_prep/dataset.multisample_profile.json"
@@ -57,22 +57,21 @@ rule Ehdn_merge_profiles:
     shell:"ExpansionHunterDenovo merge \
         --reference {params.fasta} \
         --manifest results/EHdn_prep/manifest.tsv \
-        --output-prefix dataset"
+        --output-prefix results/EHdn_prep/dataset"
 
-#motif-based comparison
+# Motif-based outlier analysis
 rule ExpansionHunterDenovo:
     input:
-        "results/EHdn_prep/manifest.tsv"
+        "results/EHdn_prep/manifest.tsv",
         "results/EHdn_prep/dataset.multisample_profile.json"
     output:
-        "results/dataset.EHdn.tsv"
+        "results/dataset_EHdn.tsv"
     shell:"{ehdn_script}/outlier.py motif \
         --manifest results/EHdn_prep/manifest.tsv \
         --multisample-profile results/EHdn_prep/dataset.multisample_profile.json \
-        --output results/dataset.EHdn.tsv \
-        # [--target-regions target_regions.bed]""
+        --output results/dataset_EHdn.tsv" \
 
-'''
+
 
 ###HipSTR 
 #rule HipSTR:
