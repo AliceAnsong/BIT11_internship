@@ -16,8 +16,8 @@ samples = [
 
 rule all:
     input:
-        "results/dataset_EHdn.tsv"
-
+        "results/dataset_EHdn.tsv",
+        "results/hipstr.vcf.gz"
 
 ###ExpansionHunter Denovo
 # Creates STR-profile per sample, containing info on STR longer than the read length of sample
@@ -72,17 +72,18 @@ rule ExpansionHunterDenovo:
         --output results/dataset_EHdn.tsv" \
 
 
-
 ###HipSTR 
-#rule HipSTR:
-#    input:
-#        expand("{input_dir}/{sample}.cram", sample=samples)
-#    output:
-#        "results/hipstr.vcf.gz"
-#    # add def-stutter-model when sample amount <20
-#    shell: "ls {input_dir}/*.cram > {input_dir}/sample_files.txt | \
-#        HipSTR --bams {input_dir}/sample_files.txt \
-#        --fasta {fasta} \
-#        --regions {bed} \
-#        --str-vcf results/hipstr.vcf.gz \
-#        --def-stutter-model"
+rule HipSTR:
+    input:
+        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples)
+    output:
+        "results/hipstr.vcf.gz"
+    # add --def-stutter-model when sample amount <20 and --min-reads when samples are few
+    shell: "ls {input_dir}/*.cram > {input_dir}/sample_files.txt | \
+        HipSTR --bam-files {input_dir}/sample_files.txt \
+        --fasta {fasta} \
+        --regions {bed} \
+        --str-vcf results/hipstr.vcf.gz \
+        --def-stutter-model \
+        --min-reads 15 | \
+        gunzip results/hipstr.vcf.gz"
