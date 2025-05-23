@@ -4,3 +4,7 @@ bed: Manta/hg38.hipstr_reference.bed
 
 #EHDN
 EHDN_script: ~/EHdn/scripts
+
+#HipSTR
+HipSTR_script: ~/HipSTR/scripts/filter_vcf.py
+split_bed: 8
