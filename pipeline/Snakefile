@@ -7,6 +7,8 @@ input_dir = config["input_dir"]
 fasta = config["fasta"]
 bed = config["bed"]
 ehdn_script = config["EHDN_script"]
+hip_script = config["HipSTR_script"]
+split_bed = config["split_bed"]
 
 samples = [
     re.sub(r"\.cram$", "", file)
@@ -14,10 +16,13 @@ samples = [
     if file.endswith(".cram")
 ]
 
+bed_files = [f"results/HipSTR_prep/bed/splitbed_{i}.bed" for i in range(split_bed)]
+
 rule all:
     input:
         "results/dataset_EHdn.tsv",
-        "results/hipstr.vcf.gz"
+        expand("results/HipSTR_prep/hipstr_{num}.vcf.gz", num=range(split_bed))
+
 
 ###ExpansionHunter Denovo
 # Creates STR-profile per sample, containing info on STR longer than the read length of sample
@@ -73,17 +78,43 @@ rule ExpansionHunterDenovo:
 
 
 ###HipSTR 
+rule HipSTR_divide_BED:
+    input:
+        bed
+    output:
+        bed_files
+    shell: "mkdir -p results/HipSTR_prep/bed && split -d \
+        --suffix-length=1 \
+        --additional-suffix=.bed \
+        -n l/{split_bed} {input} results/HipSTR_prep/bed/splitbed_"
+        
 rule HipSTR:
     input:
-        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples)
+        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples),
+        bed="results/HipSTR_prep/bed/splitbed_{num}.bed"
     output:
-        "results/hipstr.vcf.gz"
+        "results/HipSTR_prep/hipstr_{num}.vcf.gz"
     # add --def-stutter-model when sample amount <20 and --min-reads when samples are few
     shell: "ls {input_dir}/*.cram > {input_dir}/sample_files.txt | \
         HipSTR --bam-files {input_dir}/sample_files.txt \
         --fasta {fasta} \
-        --regions {bed} \
-        --str-vcf results/hipstr.vcf.gz \
+        --regions {input.bed} \
+        --str-vcf {output} \
         --def-stutter-model \
-        --min-reads 15 | \
-        gunzip results/hipstr.vcf.gz"
+        --min-reads 15"
+#
+# Filter HipSTR results
+#rule HipSTR_filter:
+#    input:
+#        "results/hipstr.vcf.gz"
+#    output:
+#        "results/hipstr.vcf.gz"
+#    conda:
+#        "env/HipSTR_filter.yaml"
+#    shell: "python {hip_script} \
+#        --vcf results/hipstr.vcf.gz \
+#        --min-call-qual         0.9 \
+#        --max-call-flank-indel  0.15 \
+#        --max-call-stutter      0.15 \
+#		--min-call-allele-bias  -2 \
+#		--min-call-strand-bias  -2"
