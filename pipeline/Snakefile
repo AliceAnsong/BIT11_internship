@@ -9,6 +9,8 @@ bed = config["bed"]
 ehdn_script = config["EHDN_script"]
 hip_script = config["HipSTR_script"]
 split_bed = config["split_bed"]
+decoy_script = config["decoy_script"]
+sort_script = config["sort_script"]
 
 samples = [
     re.sub(r"\.cram$", "", file)
@@ -21,8 +23,10 @@ bed_files = [f"results/HipSTR_prep/bed/splitbed_{i}.bed" for i in range(split_be
 rule all:
     input:
         "results/dataset_EHdn.tsv",
-        expand("results/HipSTR_prep/hipstr_{num}.vcf.gz", num=range(split_bed))
-
+        expand("results/dataset_hipstr_0.vcf", num=range(split_bed)),
+        "results/dataset_GangSTR.vcf",
+        "results/STRetch_prep/ref.STRdecoys.sorted.fasta"
+        
 
 ###ExpansionHunter Denovo
 # Creates STR-profile per sample, containing info on STR longer than the read length of sample
@@ -87,34 +91,80 @@ rule HipSTR_divide_BED:
         --suffix-length=1 \
         --additional-suffix=.bed \
         -n l/{split_bed} {input} results/HipSTR_prep/bed/splitbed_"
+
+rule sample_list:
+    input:
+        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples),
+    output:
+        "results/HipSTR_prep/sample_files.txt"
+    shell: "ls {input} > {output}"
         
 rule HipSTR:
     input:
-        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples),
-        bed="results/HipSTR_prep/bed/splitbed_{num}.bed"
+        textfile="results/HipSTR_prep/sample_files.txt",
+        bed="results/HipSTR_prep/bed/splitbed_0.bed"
     output:
-        "results/HipSTR_prep/hipstr_{num}.vcf.gz"
+        "results/HipSTR_prep/hipstr_0.vcf.gz"
+    conda:
+        "envs/HipSTR_filter.yaml"
     # add --def-stutter-model when sample amount <20 and --min-reads when samples are few
-    shell: "ls {input_dir}/*.cram > {input_dir}/sample_files.txt | \
-        HipSTR --bam-files {input_dir}/sample_files.txt \
+    shell: "HipSTR --bam-files {input.textfile} \
         --fasta {fasta} \
         --regions {input.bed} \
         --str-vcf {output} \
         --def-stutter-model \
         --min-reads 15"
-#
-# Filter HipSTR results
-#rule HipSTR_filter:
+       
+#Filter HipSTR results
+rule HipSTR_filter:
+    input:
+        "results/HipSTR_prep/hipstr_0.vcf.gz"
+    output:
+        "results/dataset_hipstr_0.vcf"
+    conda:
+        "envs/HipSTR_filter.yaml"
+    shell: "python {hip_script} \
+        --vcf {input} \
+        --min-call-qual         0.9 \
+        --max-call-flank-indel  0.15 \
+        --max-call-stutter      0.15 \
+		--min-call-allele-bias  -2 \
+		--min-call-strand-bias  -2 > {output}"
+
+
+###GangSTR
+rule GangSTR:
+    input:
+        cram=f"{input_dir}/135556.cram",
+        bed="results/HipSTR_prep/bed/splitbed_0.bed"
+    output:
+        "results/dataset_GangSTR.vcf"
+    shell: "GangSTR --bam {input.cram} \
+        --quiet \
+        --ref {fasta} \
+        --regions {input.bed} \
+        --out results/dataset_GangSTR"
+
+
+###STRetch
+#Create STR decoy reference genome
+#rule decoy_ref:
 #    input:
-#        "results/hipstr.vcf.gz"
+#        fasta
 #    output:
-#        "results/hipstr.vcf.gz"
-#    conda:
-#        "env/HipSTR_filter.yaml"
-#    shell: "python {hip_script} \
-#        --vcf results/hipstr.vcf.gz \
-#        --min-call-qual         0.9 \
-#        --max-call-flank-indel  0.15 \
-#        --max-call-stutter      0.15 \
-#		--min-call-allele-bias  -2 \
-#		--min-call-strand-bias  -2"
+#        "results/STRetch_prep/ref.STRdecoys.sorted.fasta"
+#    shell: "mkdir -p results/STRetch_prep && \
+#    python {decoy_script}  --length 2000 > results/STRetch_prep/STRdecoys.fasta | \
+#    cat {input} results/STRetch_prep/STRdecoys.fasta > results/STRetch_prep/ref_STRdecoys.fasta | \
+#    python {sort_script} --infile results/STRetch_prep/ref.STRdecoys.fasta --outfile {output}"
+
+#Create extra indices required for STRetch pipeline
+#rule index:
+#    input:
+#        "results/STRetch_prep/ref.STRdecoys.sorted.fasta"
+#    output:
+#        "results/STRetch_prep/ref.STRdecoys.sorted.fasta.genome"
+#    shell: "bwa index {input} && samtools faidx {input} | \
+#    grep STR results/STRetch_prep/ref.STRdecoys.sorted.fasta.fai | awk -v OFS='\t' '{ print $1, 0, $2 -1 }' > results/STRetch_prep/STRdecoys.bed | \
+#    bedtools sort -i results/STRetch_prep/STRdecoys.bed > results/STRetch_prep/STRdecoys.sorted.bed && \
+#    cut -f1,2  results/STRetch_prep/ref.STRdecoys.sorted.fasta.fai > {output}"
