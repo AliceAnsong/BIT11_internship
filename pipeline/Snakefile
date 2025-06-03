@@ -23,9 +23,9 @@ bed_files = [f"results/HipSTR_prep/bed/splitbed_{i}.bed" for i in range(split_be
 rule all:
     input:
         "results/dataset_EHdn.tsv",
-        expand("results/dataset_hipstr_0.vcf", num=range(split_bed)),
-        "results/dataset_GangSTR.vcf",
-        "results/STRetch_prep/ref.STRdecoys.sorted.fasta"
+        expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
+        expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
+        #"results/STRetch_prep/ref.STRdecoys.sorted.fasta"
         
 
 ###ExpansionHunter Denovo
@@ -102,9 +102,9 @@ rule sample_list:
 rule HipSTR:
     input:
         textfile="results/HipSTR_prep/sample_files.txt",
-        bed="results/HipSTR_prep/bed/splitbed_0.bed"
+        bed="results/HipSTR_prep/bed/splitbed_{num}.bed"
     output:
-        "results/HipSTR_prep/hipstr_0.vcf.gz"
+        "results/HipSTR_prep/hipstr_{num}.vcf.gz"
     conda:
         "envs/HipSTR_filter.yaml"
     # add --def-stutter-model when sample amount <20 and --min-reads when samples are few
@@ -115,12 +115,12 @@ rule HipSTR:
         --def-stutter-model \
         --min-reads 15"
        
-#Filter HipSTR results
+##Filter HipSTR results
 rule HipSTR_filter:
     input:
-        "results/HipSTR_prep/hipstr_0.vcf.gz"
+        "results/HipSTR_prep/hipstr_{num}.vcf.gz"
     output:
-        "results/dataset_hipstr_0.vcf"
+        "results/dataset_hipstr_{num}.vcf"
     conda:
         "envs/HipSTR_filter.yaml"
     shell: "python {hip_script} \
@@ -128,22 +128,23 @@ rule HipSTR_filter:
         --min-call-qual         0.9 \
         --max-call-flank-indel  0.15 \
         --max-call-stutter      0.15 \
-		--min-call-allele-bias  -2 \
-		--min-call-strand-bias  -2 > {output}"
+	--min-call-allele-bias  -2 \
+	--min-call-strand-bias  -2 > {output}"
 
 
 ###GangSTR
 rule GangSTR:
     input:
-        cram=f"{input_dir}/135556.cram",
-        bed="results/HipSTR_prep/bed/splitbed_0.bed"
+        lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
     output:
-        "results/dataset_GangSTR.vcf"
-    shell: "GangSTR --bam {input.cram} \
+        "results/dataset_{sample}_GangSTR.vcf"
+    params:
+       bed=bed
+    shell: "GangSTR --bam {input} \
         --quiet \
         --ref {fasta} \
-        --regions {input.bed} \
-        --out results/dataset_GangSTR"
+        --regions {params.bed} \
+        --out results/dataset_{wildcards.sample}_GangSTR"
 
 
 ###STRetch
