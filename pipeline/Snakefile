@@ -26,7 +26,7 @@ rule all:
         "results/dataset_EHdn.tsv",
         #expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
         #expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
-        "results/STRetch_prep/ref_STRdecoys_sorted.fasta"
+        "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome"
         
 
 ###ExpansionHunter Denovo
@@ -163,14 +163,15 @@ rule decoy_ref:
     python {sort_script} --infile results/STRetch_prep/ref_STRdecoys.fasta --outfile {output}"
 
 #Create extra indices required for STRetch pipeline
-#rule index:
-#    input:
-#        "results/STRetch_prep/ref_STRdecoys_sorted.fasta"
-#    output:
-#        "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome"
-#    shell: "bwa index {input} && samtools faidx {input} | \
-#    grep STR results/STRetch_prep/ref_STRdecoys_sorted.fasta.fai | awk -v OFS='\t' '{ print $1, 0, 
-#    $2 -1 }' > results/STRetch_prep/STRdecoys.bed | \
-#    bedtools sort -i results/STRetch_prep/STRdecoys.bed > results/STRetch_prep/STRdecoys_sorted.bed 
-#    && \
-#    cut -f1,2  results/STRetch_prep/ref_STRdecoys_sorted_fasta.fai > {output}"
+rule index:
+    input:
+        "results/STRetch_prep/ref_STRdecoys_sorted.fasta"
+    output:
+        "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome"
+    conda:
+        stretch_env
+    shell: "bwa index {input} && samtools faidx {input} | \
+    grep STR results/STRetch_prep/ref_STRdecoys_sorted.fasta.fai | \
+    awk -v OFS='\t' '{{ print $1, 0, $2 -1 }}' > results/STRetch_prep/STRdecoys.bed | \
+    bedtools sort -i results/STRetch_prep/STRdecoys.bed > results/STRetch_prep/STRdecoys_sorted.bed && \
+    cut -f1,2  results/STRetch_prep/ref_STRdecoys_sorted.fasta.fai > {output}"
