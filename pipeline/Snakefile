@@ -12,6 +12,7 @@ split_bed = config["split_bed"]
 stretch_env = config ["stretch_env"]
 decoy_script = config["decoy_script"]
 sort_script = config["sort_script"]
+config_script= config["config_script"]
 
 samples = [
     re.sub(r"\.cram$", "", file)
@@ -26,7 +27,7 @@ rule all:
         "results/dataset_EHdn.tsv",
         #expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
         #expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
-        "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome"
+        "temp.txt"
         
 
 ###ExpansionHunter Denovo
@@ -58,7 +59,7 @@ rule EHdn_manifest:
 # Merges STR-profiles of all samples in one file
 rule Ehdn_merge_profiles:
     input:
-        expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json", sample=samples),
+       #expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json", sample=samples),
         "results/EHdn_prep/manifest.tsv"
     output:
         "results/EHdn_prep/dataset.multisample_profile.json"
@@ -95,7 +96,7 @@ rule HipSTR_divide_BED:
 
 rule sample_list:
     input:
-        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples),
+        expand("{dir}/{sample}.cram", dir=input_dir, sample=samples)
     output:
         "results/HipSTR_prep/sample_files.txt"
     shell: "ls {input} > {output}"
@@ -175,3 +176,14 @@ rule index:
     awk -v OFS='\t' '{{ print $1, 0, $2 -1 }}' > results/STRetch_prep/STRdecoys.bed | \
     bedtools sort -i results/STRetch_prep/STRdecoys.bed > results/STRetch_prep/STRdecoys_sorted.bed && \
     cut -f1,2  results/STRetch_prep/ref_STRdecoys_sorted.fasta.fai > {output}"
+
+#Edit pipeline_config.groovy to point to new fasta and bed files
+rule update_pipeline_config:
+    input:
+        config_script
+    output:
+       temp("temp.txt")
+    shell:"""sed -i "s|^REF=.*|REF=$(realpath results/STRetch_prep/ref_STRdecoys_sorted.fasta)|" {input} && \
+        sed -i "s|^STR_BED=.*|STR_BED=$(realpath Manta/hg38.hipstr_reference.bed)|" {input} && \
+        sed -i "s|^DECOY_BED=.*|DECOY_BED=$(realpath results/STRetch_prep/STRdecoys.bed)|" {input} && \
+        touch {output}"""
