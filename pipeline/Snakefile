@@ -13,6 +13,7 @@ stretch_env = config ["stretch_env"]
 decoy_script = config["decoy_script"]
 sort_script = config["sort_script"]
 config_script= config["config_script"]
+stretch_script = config["stretch_script"]
 
 samples = [
     re.sub(r"\.cram$", "", file)
@@ -27,8 +28,9 @@ rule all:
         "results/dataset_EHdn.tsv",
         #expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
         #expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
+        #expand("results/{sample}.STRs.tsv",sample=samples)
+        #"results/135556.STRs.tsv"
         "temp.txt"
-        
 
 ###ExpansionHunter Denovo
 # Creates STR-profile per sample, containing info on STR longer than the read length of sample
@@ -77,10 +79,10 @@ rule ExpansionHunterDenovo:
         "results/EHdn_prep/dataset.multisample_profile.json"
     output:
         "results/dataset_EHdn.tsv"
-    shell:"{ehdn_script}/outlier.py motif \
+    shell:"{ehdn_script}/outlier.py locus \
         --manifest results/EHdn_prep/manifest.tsv \
         --multisample-profile results/EHdn_prep/dataset.multisample_profile.json \
-        --output results/dataset_EHdn.tsv" \
+        --output results/dataset_EHdn.tsv" 
 
 
 ###HipSTR 
@@ -180,10 +182,22 @@ rule index:
 #Edit pipeline_config.groovy to point to new fasta and bed files
 rule update_pipeline_config:
     input:
-        config_script
+        config_script,
+        "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome",
+        strfasta="results/STRetch_prep/ref_STRdecoys_sorted.fasta"
     output:
        temp("temp.txt")
-    shell:"""sed -i "s|^REF=.*|REF=$(realpath results/STRetch_prep/ref_STRdecoys_sorted.fasta)|" {input} && \
-        sed -i "s|^STR_BED=.*|STR_BED=$(realpath Manta/hg38.hipstr_reference.bed)|" {input} && \
-        sed -i "s|^DECOY_BED=.*|DECOY_BED=$(realpath results/STRetch_prep/STRdecoys.bed)|" {input} && \
+    shell:"""sed -i "s|^REF=.*|REF=$(realpath {input.strfasta})|" {config_script} && \
+        sed -i "s|^STR_BED=.*|STR_BED=$(realpath {bed})|" {config_script} && \
+        sed -i "s|^DECOY_BED=.*|DECOY_BED=$(realpath results/STRetch_prep/STRdecoys.bed)|" {config_script} && \
         touch {output}"""
+
+#rule STRetch:
+    input:
+       "temp.txt",
+       #samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
+    output:
+       #"results/{sample}.STRs.tsv"
+       "results/135556.STRs.tsv"
+    shell:"bpipe run -p input_regions=results/HipSTR_prep/bed/splitbed_0.bed {stretch_script} sample_data/135556.cram"
+  #"bpipe run -p input_regions={bed} {stretch_script} {input.samp}"
