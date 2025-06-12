@@ -14,4 +14,5 @@ split_bed: 8
 stretch_env: ../../STRetch/environment.yml
 decoy_script: ~/STRetch/scripts/decoy_STR.py
 sort_script: ~/STRetch/scripts/sort_fasta.py
-config_script: /home/aansong/STRetch/pipelines/pipeline_config.groovy
+config_file: /home/aansong/STRetch/pipelines/pipeline_config.groovy
+stretch_pipe: /home/aansong/STRetch/pipelines/STRetch_wgs_bam_pipeline.groovy
