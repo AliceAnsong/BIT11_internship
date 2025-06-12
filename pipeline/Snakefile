@@ -12,8 +12,8 @@ split_bed = config["split_bed"]
 stretch_env = config ["stretch_env"]
 decoy_script = config["decoy_script"]
 sort_script = config["sort_script"]
-config_script= config["config_script"]
-stretch_script = config["stretch_script"]
+config_file= config["config_file"]
+stretch_pipe = config["stretch_pipe"]
 
 samples = [
     re.sub(r"\.cram$", "", file)
@@ -26,13 +26,14 @@ bed_files = [f"results/HipSTR_prep/bed/splitbed_{i}.bed" for i in range(split_be
 rule all:
     input:
         "results/dataset_EHdn.tsv",
-        #expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
-        #expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
-        #expand("results/{sample}.STRs.tsv",sample=samples)
+        expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
+        expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
+        #expand("results/{sample}.STRs.tsv",sample=samples),
         #"results/135556.STRs.tsv"
-        "temp.txt"
 
-###ExpansionHunter Denovo
+
+
+##ExpansionHunter Denovo
 # Creates STR-profile per sample, containing info on STR longer than the read length of sample
 rule EHdn_STR_profile:
     input:
@@ -72,7 +73,7 @@ rule Ehdn_merge_profiles:
         --manifest results/EHdn_prep/manifest.tsv \
         --output-prefix results/EHdn_prep/dataset"
 
-# Motif-based outlier analysis
+# Locus-based outlier analysis
 rule ExpansionHunterDenovo:
     input:
         "results/EHdn_prep/manifest.tsv",
@@ -85,7 +86,8 @@ rule ExpansionHunterDenovo:
         --output results/dataset_EHdn.tsv" 
 
 
-###HipSTR 
+##HipSTR 
+#Divides BED file in smaller files
 rule HipSTR_divide_BED:
     input:
         bed
@@ -96,13 +98,15 @@ rule HipSTR_divide_BED:
         --additional-suffix=.bed \
         -n l/{split_bed} {input} results/HipSTR_prep/bed/splitbed_"
 
+#Makes a text file containing location of samples
 rule sample_list:
     input:
         expand("{dir}/{sample}.cram", dir=input_dir, sample=samples)
     output:
         "results/HipSTR_prep/sample_files.txt"
     shell: "ls {input} > {output}"
-        
+
+#STR calling with de novo allele generation        
 rule HipSTR:
     input:
         textfile="results/HipSTR_prep/sample_files.txt",
@@ -111,7 +115,7 @@ rule HipSTR:
         "results/HipSTR_prep/hipstr_{num}.vcf.gz"
     conda:
         "envs/HipSTR_filter.yaml"
-    # add --def-stutter-model when sample amount <20 and --min-reads when samples are few
+    # add --def-stutter-model when sample amount <20 and --min-reads when sample amount <10
     shell: "HipSTR --bam-files {input.textfile} \
         --fasta {fasta} \
         --regions {input.bed} \
@@ -136,7 +140,7 @@ rule HipSTR_filter:
 	--min-call-strand-bias  -2 > {output}"
 
 
-###GangSTR
+##GangSTR
 rule GangSTR:
     input:
         lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
@@ -151,7 +155,7 @@ rule GangSTR:
         --out results/dataset_{wildcards.sample}_GangSTR"
 
 
-###STRetch
+##STRetch
 #Create STR decoy reference genome
 rule decoy_ref:
     input:
@@ -182,22 +186,25 @@ rule index:
 #Edit pipeline_config.groovy to point to new fasta and bed files
 rule update_pipeline_config:
     input:
-        config_script,
+        config_file,
         "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome",
         strfasta="results/STRetch_prep/ref_STRdecoys_sorted.fasta"
     output:
        temp("temp.txt")
-    shell:"""sed -i "s|^REF=.*|REF=$(realpath {input.strfasta})|" {config_script} && \
-        sed -i "s|^STR_BED=.*|STR_BED=$(realpath {bed})|" {config_script} && \
-        sed -i "s|^DECOY_BED=.*|DECOY_BED=$(realpath results/STRetch_prep/STRdecoys.bed)|" {config_script} && \
-        touch {output}"""
+    #CRAM_REf only needs to be replaced when using CRAM files
+    shell:r"""sed -i "s|^CRAM_REF=.*|CRAM_REF=\"$(realpath {fasta})\"|" {config_file} && \
+    sed -i "s|^REF=.*|REF=\"$(realpath {input.strfasta})\"|" {config_file} && \
+    sed -i "s|^STR_BED=.*|STR_BED=\"$(realpath {bed})\"|" {config_file} && \
+    sed -i "s|^DECOY_BED=.*|DECOY_BED=\"$(realpath results/STRetch_prep/STRdecoys.bed)\"|" {config_file} && \
+    touch {output}"""
 
+###This rule hasn't been completed once because it takes too long to analyse one sample
 #rule STRetch:
-    input:
-       "temp.txt",
-       #samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
-    output:
-       #"results/{sample}.STRs.tsv"
-       "results/135556.STRs.tsv"
-    shell:"bpipe run -p input_regions=results/HipSTR_prep/bed/splitbed_0.bed {stretch_script} sample_data/135556.cram"
-  #"bpipe run -p input_regions={bed} {stretch_script} {input.samp}"
+#    input:
+#       "temp.txt",
+#       #samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
+#    output:
+#       #"results/{sample}.STRs.tsv"
+#       "results/135556.STRs.tsv"
+#    shell:"bpipe run -p bwa_parallelism=24 {stretch_script} sample_data/135556.cram"
+#   #"bpipe run -p input_regions={bed} {stretch_script} {input.samp}"
