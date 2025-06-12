@@ -61,3 +61,7 @@ export PATH="tools/STRetch/tools/bin:$PATH"
 ```
 $ snakemake --profile slurm --use conda
 ```
+
+ ## To do
+- [ ] Format output files of tools, so they can be compared
+- [ ] Add a section that compares output and determines the consensus STR calls per sample
