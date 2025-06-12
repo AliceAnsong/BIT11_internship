@@ -62,6 +62,10 @@ export PATH="tools/STRetch/tools/bin:$PATH"
 $ snakemake --profile slurm --use conda
 ```
 
- ## To do
+## DAG of pipeline
+![DAG of pipeline](dag.jpg)
+
+## To do
+- [ ] Add rule that merges HipSTR output files
 - [ ] Format output files of tools, so they can be compared
 - [ ] Add a section that compares output and determines the consensus STR calls per sample
