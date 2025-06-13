@@ -1,16 +1,18 @@
+##Data
 input_dir: sample_data
 fasta: Manta/GCA_000001405.15_GRCh38_full_plus_hs38d1_analysis_set.fna
 bed: Manta/hg38.hipstr_reference.bed
 
-###EHDN
-EHDN_script: ~/EHdn/scripts
+##EHDN
+EHDN_script: ~/EHdn/scripts/outlier.py
 
-###HipSTR
+##HipSTR
 HipSTR_script: ~/HipSTR/scripts/filter_vcf.py
+#split_bed => # of times that BED file will be split
 split_bed: 8
 
-###Stretch
-#Relative path of STRetch environment
+##Stretch
+#stretch_env => has to be relative path of the STRetch environment
 stretch_env: ../../STRetch/environment.yml
 decoy_script: ~/STRetch/scripts/decoy_STR.py
 sort_script: ~/STRetch/scripts/sort_fasta.py
