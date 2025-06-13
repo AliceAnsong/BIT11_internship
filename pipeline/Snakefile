@@ -28,9 +28,9 @@ rule all:
         "results/dataset_EHdn.tsv",
         expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
         expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
-        #expand("results/{sample}.STRs.tsv",sample=samples),
-        #"results/135556.STRs.tsv"
-
+        "temp.txt",
+        #expand("results/STRetch/{sample}.STRs.tsv",sample=samples),
+        #"results/STRetch/135556.STRs.tsv"
 
 
 ##ExpansionHunter Denovo
@@ -40,12 +40,10 @@ rule EHdn_STR_profile:
         lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
     output:
         "results/EHdn_prep/str-profiles/{sample}.str_profile.json"
-    params:
-        fasta=fasta
     shell: "mkdir -p results && \
         ExpansionHunterDenovo profile \
         --reads {input} \
-        --reference {params.fasta} \
+        --reference {fasta} \
         --output-prefix results/EHdn_prep/str-profiles/{wildcards.sample} \
         --min-anchor-mapq 50 \
         --max-irr-mapq 40 "
@@ -62,28 +60,25 @@ rule EHdn_manifest:
 # Merges STR-profiles of all samples in one file
 rule Ehdn_merge_profiles:
     input:
-       #expand("results/EHdn_prep/str-profiles/{sample}.str_profile.json", sample=samples),
         "results/EHdn_prep/manifest.tsv"
     output:
         "results/EHdn_prep/dataset.multisample_profile.json"
-    params:
-        fasta=fasta
     shell:"ExpansionHunterDenovo merge \
-        --reference {params.fasta} \
-        --manifest results/EHdn_prep/manifest.tsv \
+        --reference {fasta} \
+        --manifest {input} \
         --output-prefix results/EHdn_prep/dataset"
 
 # Locus-based outlier analysis
 rule ExpansionHunterDenovo:
     input:
-        "results/EHdn_prep/manifest.tsv",
-        "results/EHdn_prep/dataset.multisample_profile.json"
+        manifest="results/EHdn_prep/manifest.tsv",
+        data="results/EHdn_prep/dataset.multisample_profile.json"
     output:
         "results/dataset_EHdn.tsv"
-    shell:"{ehdn_script}/outlier.py locus \
-        --manifest results/EHdn_prep/manifest.tsv \
-        --multisample-profile results/EHdn_prep/dataset.multisample_profile.json \
-        --output results/dataset_EHdn.tsv" 
+    shell:"{ehdn_script} locus \
+        --manifest {input.manifest} \
+        --multisample-profile {input.data} \
+        --output {output}" 
 
 
 ##HipSTR 
@@ -121,7 +116,8 @@ rule HipSTR:
         --regions {input.bed} \
         --str-vcf {output} \
         --def-stutter-model \
-        --min-reads 15"
+        --min-reads 15 \
+        --quiet"
        
 ##Filter HipSTR results
 rule HipSTR_filter:
@@ -146,12 +142,10 @@ rule GangSTR:
         lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
     output:
         "results/dataset_{sample}_GangSTR.vcf"
-    params:
-       bed=bed
     shell: "GangSTR --bam {input} \
         --quiet \
         --ref {fasta} \
-        --regions {params.bed} \
+        --regions {bed} \
         --out results/dataset_{wildcards.sample}_GangSTR"
 
 
@@ -188,6 +182,7 @@ rule update_pipeline_config:
     input:
         config_file,
         "results/STRetch_prep/ref_STRdecoys_sorted.fasta.genome",
+        decoybed="results/STRetch_prep/STRdecoys.bed",
         strfasta="results/STRetch_prep/ref_STRdecoys_sorted.fasta"
     output:
        temp("temp.txt")
@@ -195,16 +190,18 @@ rule update_pipeline_config:
     shell:r"""sed -i "s|^CRAM_REF=.*|CRAM_REF=\"$(realpath {fasta})\"|" {config_file} && \
     sed -i "s|^REF=.*|REF=\"$(realpath {input.strfasta})\"|" {config_file} && \
     sed -i "s|^STR_BED=.*|STR_BED=\"$(realpath {bed})\"|" {config_file} && \
-    sed -i "s|^DECOY_BED=.*|DECOY_BED=\"$(realpath results/STRetch_prep/STRdecoys.bed)\"|" {config_file} && \
+    sed -i "s|^DECOY_BED=.*|DECOY_BED=\"$(realpath {input.decoybed})\"|" {config_file} && \
     touch {output}"""
 
 ###This rule hasn't been completed once because it takes too long to analyse one sample
+###Command doesn't specify output so result will be in BIT11_internship/pipeline folder  creates a lot of intermediate bam files (e.g 135556.10.STRdecoy.0000.bam) in the BIT11_internship/pipeline/ folder
 #rule STRetch:
 #    input:
 #       "temp.txt",
-#       #samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
+#      ##samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
 #    output:
-#       #"results/{sample}.STRs.tsv"
-#       "results/135556.STRs.tsv"
-#    shell:"bpipe run -p bwa_parallelism=24 {stretch_script} sample_data/135556.cram"
-#   #"bpipe run -p input_regions={bed} {stretch_script} {input.samp}"
+#       "results/STRetch/135556.STRs.tsv"
+#       #"results/STRetch/{sample}.STRs.tsv"
+#    shell:"mkdir -p results/STRetch && \
+#           bpipe run -p bwa_parallelism=24 -d results/STRetch {stretch_pipe} sample_data/135556.cram"
+#         ##bpipe run -p bwa_parallelism=24  input_regions={bed} {stretch_pipe} {input.samp}"
