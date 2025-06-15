@@ -9,6 +9,7 @@ bed = config["bed"]
 ehdn_script = config["EHDN_script"]
 hip_script = config["HipSTR_script"]
 split_bed = config["split_bed"]
+trtools = config["trtools"]
 stretch_env = config ["stretch_env"]
 decoy_script = config["decoy_script"]
 sort_script = config["sort_script"]
@@ -27,7 +28,7 @@ rule all:
     input:
         "results/dataset_EHdn.tsv",
         expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
-        expand("results/dataset_{sample}_GangSTR.vcf",sample=samples),
+        expand("results/dataset_gangstr_{sample}_{num}.vcf", sample=samples, num=range(split_bed)),
         "temp.txt",
         #expand("results/STRetch/{sample}.STRs.tsv",sample=samples),
         #"results/STRetch/135556.STRs.tsv"
@@ -139,14 +140,33 @@ rule HipSTR_filter:
 ##GangSTR
 rule GangSTR:
     input:
-        lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
+        samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram",
+        bed="results/HipSTR_prep/bed/splitbed_{num}.bed"
     output:
-        "results/dataset_{sample}_GangSTR.vcf"
-    shell: "GangSTR --bam {input} \
+        "results/GangSTR_prep/gangstr_{sample}_{num}.vcf"
+    shell: "mkdir -p results/GangSTR_prep && GangSTR --bam {input.samp} \
         --quiet \
         --ref {fasta} \
-        --regions {bed} \
-        --out results/dataset_{wildcards.sample}_GangSTR"
+        --regions {input.bed} \
+        --out results/GangSTR_prep/gangstr_{wildcards.sample}_{wildcards.num}"
+
+rule GangSTR_filter:
+    input:
+        "results/GangSTR_prep/gangstr_{sample}_{num}.vcf"
+    output:
+        "results/dataset_gangstr_{sample}_{num}.vcf",
+        temp("results/dataset_gangstr_{sample}_{num}.samplog.tab"),
+        temp("results/dataset_gangstr_{sample}_{num}.loclog.tab")
+    shell: "PYTHONPATH={trtools} \
+        python -m trtools.dumpSTR.dumpSTR \
+        --vcf {input} \
+        --vcftype gangstr \
+        --gangstr-max-call-DP 1000 \
+        --gangstr-filter-spanbound-only \
+        --gangstr-filter-badCI \
+        --gangstr-min-call-DP 20 \
+        --drop-filtered \
+        --out results/dataset_gangstr_{wildcards.sample}_{wildcards.num}"	      
 
 
 ##STRetch
