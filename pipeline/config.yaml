@@ -11,6 +11,9 @@ HipSTR_script: ~/HipSTR/scripts/filter_vcf.py
 #split_bed => # of times that BED file will be split
 split_bed: 8
 
+##GangSTR
+trtools: /home/aansong/TRTools
+
 ##Stretch
 #stretch_env => has to be relative path of the STRetch environment
 stretch_env: ../../STRetch/environment.yml
