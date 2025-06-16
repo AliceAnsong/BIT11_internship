@@ -27,8 +27,8 @@ bed_files = [f"results/HipSTR_prep/bed/splitbed_{i}.bed" for i in range(split_be
 rule all:
     input:
         "results/dataset_EHdn.tsv",
-        expand("results/dataset_hipstr_{num}.vcf", num=range(split_bed)),
-        expand("results/dataset_gangstr_{sample}_{num}.vcf", sample=samples, num=range(split_bed)),
+        "results/dataset_HipSTR.vcf",
+        expand("results/dataset_GangSTR_{sample}.vcf",sample=samples),
         "temp.txt",
         #expand("results/STRetch/{sample}.STRs.tsv",sample=samples),
         #"results/STRetch/135556.STRs.tsv"
@@ -40,14 +40,16 @@ rule EHdn_STR_profile:
     input:
         lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
     output:
-        "results/EHdn_prep/str-profiles/{sample}.str_profile.json"
+        "results/EHdn_prep/str-profiles/{sample}.str_profile.json",
+        temp("results/EHdn_prep/str-profiles/{sample}.locus.tsv"),
+        temp("results/EHdn_prep/str-profiles/{sample}.motif.tsv")
     shell: "mkdir -p results && \
         ExpansionHunterDenovo profile \
         --reads {input} \
         --reference {fasta} \
         --output-prefix results/EHdn_prep/str-profiles/{wildcards.sample} \
         --min-anchor-mapq 50 \
-        --max-irr-mapq 40 "
+        --max-irr-mapq 40"
         
 # Creates tsv file containing sample id, case status, and path to the associated STR-profile
 rule EHdn_manifest:
@@ -120,12 +122,12 @@ rule HipSTR:
         --min-reads 15 \
         --quiet"
        
-##Filter HipSTR results
+#Filter HipSTR results
 rule HipSTR_filter:
     input:
         "results/HipSTR_prep/hipstr_{num}.vcf.gz"
     output:
-        "results/dataset_hipstr_{num}.vcf"
+        "results/HipSTR_prep/filtered_hipstr_{num}.vcf"
     conda:
         "envs/HipSTR_filter.yaml"
     shell: "python {hip_script} \
@@ -133,8 +135,18 @@ rule HipSTR_filter:
         --min-call-qual         0.9 \
         --max-call-flank-indel  0.15 \
         --max-call-stutter      0.15 \
-	--min-call-allele-bias  -2 \
-	--min-call-strand-bias  -2 > {output}"
+	    --min-call-allele-bias  -2 \
+	    --min-call-strand-bias  -2 > {output}"
+
+#Merge filtered HipSTR files
+rule HipSTR_merge:
+    input:
+       expand("results/HipSTR_prep/filtered_hipstr_{num}.vcf",num=range(split_bed))
+    output:
+       "results/dataset_HipSTR.vcf"
+    shell:"ls results/HipSTR_prep/filtered* > results/HipSTR_prep/filtered_hip.txt && \
+        bcftools concat -f results/HipSTR_prep/filtered_hip.txt \
+        -o {output}"
 
 
 ##GangSTR
@@ -143,20 +155,23 @@ rule GangSTR:
         samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram",
         bed="results/HipSTR_prep/bed/splitbed_{num}.bed"
     output:
-        "results/GangSTR_prep/gangstr_{sample}_{num}.vcf"
+        "results/GangSTR_prep/gangstr_{sample}_{num}.vcf",
+        temp("results/GangSTR_prep/gangstr_{sample}_{num}.insdata.tab"),
+        temp("results/GangSTR_prep/gangstr_{sample}_{num}.samplestats.tab")
     shell: "mkdir -p results/GangSTR_prep && GangSTR --bam {input.samp} \
         --quiet \
         --ref {fasta} \
         --regions {input.bed} \
         --out results/GangSTR_prep/gangstr_{wildcards.sample}_{wildcards.num}"
 
+#Filter GangSTR results
 rule GangSTR_filter:
     input:
         "results/GangSTR_prep/gangstr_{sample}_{num}.vcf"
     output:
-        "results/dataset_gangstr_{sample}_{num}.vcf",
-        temp("results/dataset_gangstr_{sample}_{num}.samplog.tab"),
-        temp("results/dataset_gangstr_{sample}_{num}.loclog.tab")
+        "results/GangSTR_prep/filtered_gangstr_{sample}_{num}.vcf",
+        temp("results/GangSTR_prep/filtered_gangstr_{sample}_{num}.samplog.tab"),
+        temp("results/GangSTR_prep/filtered_gangstr_{sample}_{num}.loclog.tab")
     shell: "PYTHONPATH={trtools} \
         python -m trtools.dumpSTR.dumpSTR \
         --vcf {input} \
@@ -166,8 +181,17 @@ rule GangSTR_filter:
         --gangstr-filter-badCI \
         --gangstr-min-call-DP 20 \
         --drop-filtered \
-        --out results/dataset_gangstr_{wildcards.sample}_{wildcards.num}"	      
+        --out results/GangSTR_prep/filtered_gangstr_{wildcards.sample}_{wildcards.num}"	      
 
+#Merge GangSTR files per sample
+rule GangSTR_merge:
+    input:
+       lambda wildcards: expand("results/GangSTR_prep/filtered_gangstr_{sample}_{num}.vcf",sample=wildcards.sample, num=range(split_bed))
+    output:
+       "results/dataset_GangSTR_{sample}.vcf"
+    shell:"ls results/GangSTR_prep/filtered_gangstr_{wildcards.sample}*  > results/GangSTR_prep/filtered_gang.txt && \
+        bcftools concat -f results/GangSTR_prep/filtered_gang.txt \
+        -o {output}"
 
 ##STRetch
 #Create STR decoy reference genome
@@ -214,14 +238,14 @@ rule update_pipeline_config:
     touch {output}"""
 
 ###This rule hasn't been completed once because it takes too long to analyse one sample
-###Command doesn't specify output so result will be in BIT11_internship/pipeline folder  creates a lot of intermediate bam files (e.g 135556.10.STRdecoy.0000.bam) in the BIT11_internship/pipeline/ folder
+###Creates a lot of intermediate bam files (e.g 135556.10.STRdecoy.0000.bam)
 #rule STRetch:
 #    input:
 #       "temp.txt",
 #      ##samp=lambda wildcards: f"{input_dir}/{wildcards.sample}.cram"
 #    output:
 #       "results/STRetch/135556.STRs.tsv"
-#       #"results/STRetch/{sample}.STRs.tsv"
+#       ##"results/STRetch/{sample}.STRs.tsv"
 #    shell:"mkdir -p results/STRetch && \
 #           bpipe run -p bwa_parallelism=24 -d results/STRetch {stretch_pipe} sample_data/135556.cram"
-#         ##bpipe run -p bwa_parallelism=24  input_regions={bed} {stretch_pipe} {input.samp}"
+#         ##bpipe run -p bwa_parallelism=24  -d results/STRetch {stretch_pipe} {input.samp}"
