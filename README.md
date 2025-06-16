@@ -27,8 +27,8 @@ $ conda env create -f envs/snakemake.yaml
 $ conda activate snakemake
 ```
 
-### STR-tools
-Install the following tools using their GitHub documentation in a tools subdirectory of BIT11_internship/pipeline/ :
+### Tools
+Install the following tools using their GitHub documentation in a tools subdirectory of BIT11_internship/pipeline/ so that determining paths is a bit easier:
 -	ExpansionHunter Denovo: 
 https://github.com/Illumina/ExpansionHunterDenovo
 -	HipSTR:
@@ -36,6 +36,8 @@ https://github.com/HipSTR-Tool/HipSTR
 -	STRetch:
 https://github.com/Oshlack/STRetch
 - [GangSTR](https://github.com/gymreklab/GangSTR) is already included in the snakemake.yaml file so it does not need to be installed again.
+- TRTools:
+https://github.com/gymrek-lab/TRTools
 
 ## Running the pipeline
 1.	Go to the directory:
@@ -47,7 +49,7 @@ $ cd BIT11_internship/pipeline/
 $ conda activate snakemake
 ```
 3.	Place your sample files (CRAM/BAM) in a subdirectory.
-4.	Place your reference genome in another subdirectory. 
+4.	Place your reference genome in another subdirectory and download the correct [HipSTR BED file](https://github.com/HipSTR-Tool/HipSTR-references/) in that same subdirectory.
 The exact names of these subdirectories does not matter, because their paths need to be defined in the config.yaml file.
 5.	Modify the config.yaml file
 6.	A couple of things need to be added to your .bashrc to make tools executable wherever (modify paths as needed):
@@ -61,11 +63,45 @@ export PATH="tools/STRetch/tools/bin:$PATH"
 ```
 $ snakemake --profile slurm --use conda
 ```
+## Output
+Example of how your directory may look after running this pipeline:
+```
+BIT11_internship/pipeline/
+├── config.yaml
+├── dag.png
+├── envs
+│   ├── HipSTR_filter.yaml
+│   └── snakemake.yaml
+├── manifest.sh
+├── references
+│   ├── GRCh38.fasta
+│   └── hg38.hipstr_reference.bed
+├── results
+│   ├── dataset_EHdn.tsv
+│   ├── dataset_GangSTR_A.vcf
+│   ├── dataset_HipSTR.vcf
+│   ├── EHdn_prep
+│   ├── GangSTR_prep
+│   ├── HipSTR_prep
+│   ├── STRetch
+│   └── STRetch_prep
+├── sample_data
+│   ├── A.crai
+│   └── A.cram
+├── tools
+│   ├── Ehdn
+│   ├── HipSTR
+│   ├── STRetch
+│   └── TRTools
+├── Snakefile
+└── temp.txt
+```
+When using multiple samples, ExpansionHunter Denovo and HipSTR will output one tsv/vcf file, while GangSTR will output a vcf file per sample.
 
 ## DAG of pipeline
-![DAG of pipeline](dag.jpg)
+![DAG of pipeline](pipeline/dag.png)
 
 ## To do
-- [ ] Add rule that merges HipSTR output files
+- [x] ~~Add rule that merges HipSTR output files~~
 - [ ] Format output files of tools, so they can be compared
 - [ ] Add a section that compares output and determines the consensus STR calls per sample
