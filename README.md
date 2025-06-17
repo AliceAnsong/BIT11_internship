@@ -54,12 +54,9 @@ The exact names of these subdirectories does not matter, because their paths nee
 5.	Modify the config.yaml file
 6.	A couple of things need to be added to your .bashrc to make tools executable wherever (modify paths as needed):
 ```
-export PATH="tools/EHdn/bin:$PATH" 
-export PATH="tools/HipSTR:$PATH"
-export PATH="tools/STRetch/tools/bwa.kit:$PATH"
-export PATH="tools/STRetch/tools/bin:$PATH"
+export PATH="$HOME/BIT11_internship/pipeline/tools/EHdn/bin:$HOME/BIT11_internship/pipeline/tools/HipSTR:$HOME/BIT11_internship/pipeline/tools/STRetch/tools/bwa.kit:$HOME/BIT11_internship/pipeline/tools/STRetch/tools/bin:$PATH"
 ```
-7.	Run Snakemake; it is recommended to use SLURM. This pipeline also requires `–use-conda` for managing environments per rule
+7.	Run Snakemake; it is recommended to use [SLURM](https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles). This pipeline also requires `--use-conda` for managing environments per rule
 ```
 $ snakemake --profile slurm --use conda
 ```
